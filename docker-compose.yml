@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: simplehelp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: simplehelp
+      POSTGRES_USER: simplehelp
+      POSTGRES_PASSWORD: simplehelp
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./backend/internal/db/migrations:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simplehelp -d simplehelp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

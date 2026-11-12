@@ -4,7 +4,7 @@ a helpdesk application to handle customer requests
 - the whole app with multiple components will be runnable using docker with docker compose  
 - use postgresql as database  
 - use Vue 3 composition API for frontend (with vite?)  
-- use Go with Gin as backend  
+- use Go with Gin as backend, migrate for migrations
 - use MVC with that separate business logic with db calls to make it testable  
 - will be mobile-first (can be fully used on mobile, usable on laptops screen)  
 ## User Roles  
