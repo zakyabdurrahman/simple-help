@@ -23,7 +23,8 @@ a helpdesk application to handle customer requests
 | Table | Main Columns |
 | --- | --- |
 | `users` | `id`, `name`, `email` (unique), `password_hash`, `role`, `created_at` |
-| `tickets` | `id`, `title`, `description`, `category`, `priority`, `status`, `requester_id` (users), `assignee_id` (users), `created_at`, `updated_at` |
+| `tickets` | `id`, `title`, `description`, `category`, `priority`, `status_id` (status), `requester_id` (users), `assignee_id` (users), `created_at`, `updated_at` |
 | `comments` | `id`, `ticket_id` (tickets), `author_id` (users), `body`, `is_internal`, `created_at` |  
+| `status` | `id`, `text` |  
 ## Business Flow  
 
