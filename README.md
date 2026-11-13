@@ -75,3 +75,4 @@ docker compose down -v       # wipe data volume
 │               └── 001_init.sql   # schema (auto-run on first db init)
 └── frontend/                       # planned
 ```
+## Assumptions  

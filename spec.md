@@ -26,5 +26,69 @@ a helpdesk application to handle customer requests
 | `tickets` | `id`, `title`, `description`, `category`, `priority`, `status_id` (status), `requester_id` (users), `assignee_id` (users), `created_at`, `updated_at` |
 | `comments` | `id`, `ticket_id` (tickets), `author_id` (users), `body`, `is_internal`, `created_at` |  
 | `status` | `id`, `text` |  
-## Business Flow  
+## Backend Functions  
+| Method | Path | Function | Access |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/register` | Register a requester account | Public |
+| `POST` | `/api/auth/login` | Log in, returns JWT | Public |
+| `GET` | `/api/me` | Current user profile | Logged in |
+| `GET` | `/api/tickets` | List tickets (filtering, pagination) | Logged in, role-restricted |
+| `POST` | `/api/tickets` | Create a ticket | Logged in |
+| `GET` | `/api/tickets/{id}` | Ticket details including comments | Owner, agent, admin |
+| `PATCH` | `/api/tickets/{id}` | Update status, priority, assignee | Per transition table |
+| `POST` | `/api/tickets/{id}/comments` | Add a comment or internal note | Owner, agent, admin |
+| `GET` | `/api/users` | List users | Admin |
+| `PATCH` | `/api/users/{id}/role` | Change user role | Admin |
+
+## Auth
+
+### `POST /api/auth/register`
+Create a new user account. Public (no auth required).
+
+Public registration always creates a **Requester** role. Agent/Admin accounts
+are created by an Admin via a separate admin endpoint (not covered here).
+
+#### Request body
+| Field          | Type   | Required | Rules |
+| -------------- | ------ | -------- | ----- |
+| `name`         | string | yes      | 1–100 chars, trimmed |
+| `email`        | string | yes      | valid email format, lowercased, unique across `users.email` |
+| `password`     | string | yes      | 8–72 chars (bcrypt limit), at least 1 letter and 1 number |
+
+#### Validation
+- All required fields present and non-empty after trim.
+- `email` matched against a basic RFC-ish regex, then lowercased.
+- `password` length and complexity checked before hashing.
+- On any validation failure → `400 Bad Request` with a JSON body:
+  ```json
+  { "error": "validation_failed", "fields": { "email": "already in use" } }
+  ```
+
+#### Logic
+1. Validate input (above).
+2. Check `users.email` uniqueness; if exists → `409 Conflict`.
+3. Hash `password` with bcrypt (cost 12) → `password_hash`.
+4. Insert into `users` with `role = 'requester'`, `created_at = now()`.
+5. Return `201 Created` with the public user representation (no `password_hash`).
+
+#### Responses
+`201 Created`
+```json
+{
+  "id": 12,
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "role": "requester",
+  "created_at": "2026-11-13T10:00:00Z"
+}
+```
+
+`400 Bad Request` — validation failure (see above).
+`409 Conflict` — email already registered.
+`500 Internal Server Error` — unexpected failure.
+
+#### Security / notes
+- `password_hash` is never included in any response.
+- Passwords are never logged.
+- Email normalization (lowercase + trim) happens before uniqueness check so `Jane@X.com` and `jane@x.com` collide correctly.
 

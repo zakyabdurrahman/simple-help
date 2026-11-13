@@ -1,0 +1,9 @@
+# build artifacts
+/out/
+/bin/
+*.exe
+
+# editor / OS
+.idea/
+.vscode/
+.DS_Store

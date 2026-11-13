@@ -10,13 +10,30 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./backend/internal/db/migrations:/docker-entrypoint-initdb.d:ro
+      - ./backend/db/migrations:/docker-entrypoint-initdb.d:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U simplehelp -d simplehelp"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    build: ./backend
+    container_name: simplehelp-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: simplehelp
+      DB_PASS: simplehelp
+      DB_NAME: simplehelp
+      PORT: "8080"
+    ports:
+      - "8080:8080"
 
 volumes:
   pgdata:
