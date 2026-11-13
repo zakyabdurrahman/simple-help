@@ -1,1 +1,2 @@
-- make a go backend hello world gin
+- write API spec/contract  
+- refactor migration inside go container
