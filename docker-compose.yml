@@ -33,8 +33,8 @@ services:
       DB_PASS: simplehelp
       DB_NAME: simplehelp
       PORT: "8080"
-      # JWT_SECRET should be set to a strong random value in production.
-      JWT_SECRET: dev-secret-change-me
+      # JWT_SECRET must be provided via .env (see .env.example).
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — copy .env.example to .env}
     ports:
       - "8080:8080"
 

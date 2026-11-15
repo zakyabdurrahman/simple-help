@@ -12,6 +12,17 @@ A helpdesk application to handle customer requests.
 ## Prerequisites
 - [Docker](https://www.docker.com/) (with Compose v2)
 
+## First-time setup
+
+Copy the env template and set a JWT secret (required — the backend won't
+start without it):
+```bash
+cp .env.example .env
+# edit .env and set JWT_SECRET to a strong random string
+```
+`.env` is gitignored; `.env.example` is the tracked template. Docker Compose
+reads `.env` automatically.
+
 ## Running the App
 
 ```bash
@@ -135,6 +146,9 @@ See [`api.md`](api.md) for the full HTTP API contract.
 .
 ├── docker-compose.yml
 ├── spec.md
+├── .env.example                   # env template (tracked)
+├── .env                           # local secrets (gitignored)
+├── .gitignore
 ├── api.md                          # API contract
 ├── backend/
 │   ├── Dockerfile
@@ -164,3 +178,48 @@ See [`api.md`](api.md) for the full HTTP API contract.
 └── frontend/                       # planned
 ```
 ## Assumptions
+
+Backend implementation assumptions (complements `spec.md`):
+
+### Auth
+- **JWT bearer tokens**, HS256-signed, default 24h expiry. Single shared secret (`JWT_SECRET`); no key rotation or refresh tokens.
+- `JWT_SECRET` is **required** in Docker Compose (fails fast via `.env`); `config.go` retains a dev default only for running the binary directly outside compose (`go run`).
+- No HTTPS/TLS termination in the app — assumes a reverse proxy handles TLS in production.
+- No rate limiting on auth endpoints (`/login`, `/register`).
+- Password hashing: bcrypt cost 12.
+
+### Users & roles
+- Roles are stored as `TEXT` with a `CHECK` constraint (`requester`, `agent`, `admin`) — **not** a separate `roles` table.
+- Public registration (`POST /api/auth/register`) **always** creates a `requester`. Agent/admin accounts are created via the seeder or by an admin via `PATCH /api/users/{id}/role`.
+- Email is lowercased + trimmed before the uniqueness check so case variants collide correctly.
+- Email uniqueness is enforced at the application layer (check-then-insert) with the DB `UNIQUE` constraint as a backstop for race conditions; no explicit transaction wraps the check-then-insert.
+
+### Tickets
+- Requesters see **only their own** tickets; agents and admins see all. Enforced in both `GET /api/tickets` (list) and `GET /api/tickets/{id}` (detail).
+- New tickets start with status `open`, default priority `medium`.
+- Status transitions are enforced per the table in `api.md`/`spec.md`; illegal transitions return `422 invalid_transition`.
+- Priority and assignee changes are **agent/admin only**; requesters get `403`.
+- `assignee_id` is nullable; `0` in a PATCH means unassign.
+- `category` is nullable free text.
+- Pagination defaults: tickets `limit=20` (max 100), users `limit=50` (max 200).
+
+### Comments
+- Returned inline with ticket detail (`GET /api/tickets/{id}`) — no separate comment-list endpoint.
+- Internal notes (`is_internal: true`) are **agent/admin only**; requesters get `403`.
+
+### Error envelope
+- All errors use `{"error": "<code>", "fields": {...}}`; `fields` is omitted when absent.
+- Email-already-registered returns `409` with `error: "email_exists"` (not `validation_failed` as the `spec.md` example illustrated — the code's behavior is canonical).
+- Invalid status transition returns `422` (not `400`).
+
+### Migrations & seeder
+- Migrations run **on every backend startup** via `migrate up` (idempotent — only pending migrations apply). The DB owns version tracking via `schema_migrations`.
+- The seeder (`/app/seed`) is a separate binary run on demand; idempotent (skips existing users). The seeded password `"password"` (no digit) deliberately bypasses register validation by inserting via the repository directly.
+
+### Tests
+- Integration tests run against the **real** `db` service (no testcontainers, no mocking). Each test cleans `comments → tickets → users` to satisfy FKs and stay isolated.
+- Test JWT secret/expiry are fixed constants in the test helper for deterministic, parseable tokens.
+
+### Deployment
+- Single-instance assumption — no horizontal-scaling concerns addressed (DB pool is shared; no distributed locking).
+- DB credentials are hardcoded in `docker-compose.yml` (not moved to `.env`) by explicit decision; only `JWT_SECRET` is externalized.
