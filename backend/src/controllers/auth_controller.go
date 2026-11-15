@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"simplehelp/src/middleware"
 	"simplehelp/src/services"
 
 	"github.com/gin-gonic/gin"
@@ -50,6 +51,50 @@ func (c *AuthController) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, user)
 }
 
+// loginRequest is the JSON body for POST /api/auth/login.
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+// Login handles POST /api/auth/login.
+func (c *AuthController) Login(ctx *gin.Context) {
+	var req loginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		writeError(ctx, http.StatusBadRequest, "invalid_json", map[string]string{
+			"body": "could not parse JSON body",
+		})
+		return
+	}
+
+	res, err := c.auth.Login(ctx.Request.Context(), services.LoginInput{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	if err != nil {
+		c.writeLoginError(ctx, err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, res)
+}
+
+// Me handles GET /api/me.
+func (c *AuthController) Me(ctx *gin.Context) {
+	uid := middleware.UserIDFrom(ctx)
+	user, err := c.auth.Me(ctx.Request.Context(), uid)
+	if err != nil {
+		if errors.Is(err, services.ErrNotFound) {
+			writeError(ctx, http.StatusNotFound, "not_found", nil)
+			return
+		}
+		slog.Error("me failed", "error", err)
+		writeError(ctx, http.StatusInternalServerError, "internal_error", nil)
+		return
+	}
+	ctx.JSON(http.StatusOK, user)
+}
+
 // writeRegisterError maps a service error to the appropriate HTTP response.
 func (c *AuthController) writeRegisterError(ctx *gin.Context, err error) {
 	var ve *services.ValidationError
@@ -64,5 +109,20 @@ func (c *AuthController) writeRegisterError(ctx *gin.Context, err error) {
 		return
 	}
 	slog.Error("register failed unexpectedly", "error", err)
+	writeError(ctx, http.StatusInternalServerError, "internal_error", nil)
+}
+
+// writeLoginError maps a service error from Login to an HTTP response.
+func (c *AuthController) writeLoginError(ctx *gin.Context, err error) {
+	var ve *services.ValidationError
+	if errors.As(err, &ve) {
+		writeError(ctx, http.StatusBadRequest, "validation_failed", ve.Fields)
+		return
+	}
+	if errors.Is(err, services.ErrInvalidCredentials) {
+		writeError(ctx, http.StatusUnauthorized, "invalid_credentials", nil)
+		return
+	}
+	slog.Error("login failed unexpectedly", "error", err)
 	writeError(ctx, http.StatusInternalServerError, "internal_error", nil)
 }

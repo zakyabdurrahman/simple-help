@@ -34,7 +34,7 @@ func main() {
 	}
 	defer database.Close()
 
-	engine := server.New(database)
+	engine := server.New(database, cfg.JWTSecret, cfg.JWTExpiry)
 
 	srv := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),

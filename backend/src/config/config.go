@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Config holds all runtime configuration loaded from the environment.
@@ -16,17 +17,24 @@ type Config struct {
 
 	// Port is the HTTP port the Gin server listens on.
 	Port int
+
+	// JWTSecret signs auth tokens. Set JWT_SECRET in production.
+	JWTSecret string
+	// JWTExpiry is how long a login token remains valid.
+	JWTExpiry time.Duration
 }
 
 // Load reads configuration from environment variables, applying defaults
 // that match the docker-compose setup so the app runs out of the box.
 func Load() (Config, error) {
 	cfg := Config{
-		DBHost: envOr("DB_HOST", "db"),
-		DBUser: envOr("DB_USER", "simplehelp"),
-		DBPass: envOr("DB_PASS", "simplehelp"),
-		DBName: envOr("DB_NAME", "simplehelp"),
-		Port:   envIntOr("PORT", 8080),
+		DBHost:    envOr("DB_HOST", "db"),
+		DBUser:    envOr("DB_USER", "simplehelp"),
+		DBPass:    envOr("DB_PASS", "simplehelp"),
+		DBName:    envOr("DB_NAME", "simplehelp"),
+		Port:      envIntOr("PORT", 8080),
+		JWTSecret: envOr("JWT_SECRET", "dev-secret-change-me"),
+		JWTExpiry: envDurationOr("JWT_EXPIRY", 24*time.Hour),
 	}
 
 	dbPort, err := envInt("DB_PORT", 5432)
@@ -71,4 +79,16 @@ func envInt(key string, def int) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+func envDurationOr(key string, def time.Duration) time.Duration {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return def
+	}
+	return d
 }

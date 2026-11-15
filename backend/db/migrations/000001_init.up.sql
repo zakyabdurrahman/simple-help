@@ -1,10 +1,6 @@
--- 001_init.sql
+-- 000001_init.up.sql
 -- Initial schema for SimpleHelp.
--- Auto-run by Postgres on first container init (empty data dir) via
--- /docker-entrypoint-initdb.d. To re-run after edits:
---   docker compose down -v && docker compose up -d db
-
-BEGIN;
+-- Run by golang-migrate on backend container startup.
 
 -- users ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
@@ -69,5 +65,3 @@ CREATE TRIGGER trg_tickets_updated_at
     BEFORE UPDATE ON tickets
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at();
-
-COMMIT;

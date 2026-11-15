@@ -10,6 +10,18 @@ var (
 
 	// ErrEmailExists indicates the email is already registered.
 	ErrEmailExists = errors.New("email_exists")
+
+	// ErrInvalidCredentials indicates email/password did not match.
+	ErrInvalidCredentials = errors.New("invalid_credentials")
+
+	// ErrNotFound indicates the requested resource was not found.
+	ErrNotFound = errors.New("not_found")
+
+	// ErrInvalidTransition indicates an illegal ticket status transition.
+	ErrInvalidTransition = errors.New("invalid_transition")
+
+	// ErrForbidden indicates an authenticated user lacks permission.
+	ErrForbidden = errors.New("forbidden")
 )
 
 // ValidationError carries per-field messages alongside ErrValidation.
