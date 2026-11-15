@@ -256,10 +256,11 @@ Create a ticket. The authenticated user becomes the `requester`. New tickets sta
 List tickets visible to the caller. Requesters see only their own tickets; agents and admins see all.
 
 #### Query params
-| Param    | Default | Notes                          |
-| -------- | ------- | ------------------------------ |
-| `limit`  | 20      | 1–100.                         |
-| `offset` | 0       | pagination offset.             |
+| Param    | Default | Notes                                                            |
+| -------- | ------- | ---------------------------------------------------------------- |
+| `q`      | (none)  | Case-insensitive substring search on title OR description.       |
+| `limit`  | 20      | 1–100.                                                           |
+| `offset` | 0       | pagination offset.                                               |
 
 #### Response
 **`200 OK`**

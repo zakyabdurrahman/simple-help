@@ -2,6 +2,7 @@ package integration
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"simplehelp/src/models"
@@ -414,6 +415,132 @@ func TestUsers_UpdateRole_NonAdminForbidden(t *testing.T) {
 	w := doJSONAuth(t, h, "PATCH", "/api/users/"+itoaStr(aid)+"/role", rTok, map[string]string{"role": "admin"})
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---------- Ticket: search ----------
+
+func TestTicket_Search_TitleMatch(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	aTok, _ := seedRoleToken(t, h, models.RoleAgent)
+
+	// Create three tickets with distinct titles/descriptions.
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{
+		"title": "Printer not working", "description": "It stopped",
+	})
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{
+		"title": "Login issue", "description": "Cannot login",
+	})
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{
+		"title": "Email broken", "description": "printer queue jammed",
+	})
+
+	// Search "printer" -> matches title of #1 and description of #3.
+	req := httptest.NewRequest("GET", "/api/tickets?q=printer", nil)
+	req.Header.Set("Authorization", "Bearer "+aTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	if len(tickets) != 2 {
+		t.Errorf("expected 2 matching tickets, got %d", len(tickets))
+	}
+}
+
+func TestTicket_Search_CaseInsensitive(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	aTok, _ := seedRoleToken(t, h, models.RoleAgent)
+
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{
+		"title": "Printer Not Working", "description": "It stopped",
+	})
+
+	req := httptest.NewRequest("GET", "/api/tickets?q=PRINTER", nil)
+	req.Header.Set("Authorization", "Bearer "+aTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	if len(tickets) != 1 {
+		t.Errorf("case-insensitive match should find 1, got %d", len(tickets))
+	}
+}
+
+func TestTicket_Search_NoMatch(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	aTok, _ := seedRoleToken(t, h, models.RoleAgent)
+
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{
+		"title": "Printer not working", "description": "It stopped",
+	})
+
+	req := httptest.NewRequest("GET", "/api/tickets?q=nonexistentterm", nil)
+	req.Header.Set("Authorization", "Bearer "+aTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	if len(tickets) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(tickets))
+	}
+}
+
+func TestTicket_Search_RequesterScoped(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	r1Tok, _ := seedRoleToken(t, h, models.RoleRequester)
+	r2Tok, _ := seedRoleToken(t, h, models.RoleRequester)
+
+	// r1 creates a ticket matching "printer".
+	doJSONAuth(t, h, "POST", "/api/tickets", r1Tok, map[string]string{
+		"title": "Printer broken", "description": "help",
+	})
+	// r2 creates a ticket also matching "printer" — but r1 should not see it.
+	doJSONAuth(t, h, "POST", "/api/tickets", r2Tok, map[string]string{
+		"title": "Printer jam", "description": "help",
+	})
+
+	req := httptest.NewRequest("GET", "/api/tickets?q=printer", nil)
+	req.Header.Set("Authorization", "Bearer "+r1Tok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	if len(tickets) != 1 {
+		t.Errorf("requester should only see their own matching ticket (1), got %d", len(tickets))
+	}
+}
+
+func TestTicket_Search_EmptyReturnsAll(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	aTok, _ := seedRoleToken(t, h, models.RoleAgent)
+
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{"title": "A", "description": "x"})
+	doJSONAuth(t, h, "POST", "/api/tickets", aTok, map[string]string{"title": "B", "description": "y"})
+
+	// No q param -> all tickets returned.
+	req := httptest.NewRequest("GET", "/api/tickets", nil)
+	req.Header.Set("Authorization", "Bearer "+aTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	if len(tickets) != 2 {
+		t.Errorf("without q, expected all 2 tickets, got %d", len(tickets))
 	}
 }
 

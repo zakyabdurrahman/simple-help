@@ -106,7 +106,13 @@ func (r *userRepo) List(ctx context.Context, limit, offset int) ([]*models.User,
 		}
 		users = append(users, u)
 	}
-	return users, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if users == nil {
+		users = []*models.User{}
+	}
+	return users, nil
 }
 
 func (r *userRepo) UpdateRole(ctx context.Context, id int64, role string) (*models.User, error) {

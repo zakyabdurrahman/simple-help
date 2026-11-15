@@ -1,0 +1,367 @@
+{
+  "info": {
+    "name": "SimpleHelp API",
+    "description": "Collection for the SimpleHelp helpdesk API.\n\nSetup:\n1. Set the `base_url` variable (default http://localhost:8080).\n2. Run `POST /auth/register` or `POST /auth/login` — the token is auto-saved to the `jwt_token` variable.\n3. Authenticated requests use `Bearer {{jwt_token}}` automatically.\n\nSeed accounts (run `docker compose exec backend /app/seed`):\n- requester@example.com / password (requester)\n- agent@example.com / password (agent)\n- admin@example.com / password (admin)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "description": "Backend base URL"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "description": "Auto-populated by the login/register scripts"
+    },
+    {
+      "key": "ticket_id",
+      "value": "",
+      "description": "Auto-populated after creating a ticket"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "description": "Auto-populated after fetching /me"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Public authentication endpoints",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"secret123\"\n}"
+            },
+            "description": "Register a new requester account. Email is lowercased; password must be >=8 chars with at least one letter and one digit."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var body = pm.response.json();",
+                  "    pm.collectionVariables.set('user_id', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"requester@example.com\",\n  \"password\": \"password\"\n}"
+            },
+            "description": "Log in with email + password. Returns a JWT token and the current user. Use the seeded accounts (requester/agent/admin @example.com, password 'password')."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', body.token);",
+                  "    pm.collectionVariables.set('user_id', body.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "me"]
+            },
+            "description": "Get the authenticated user's profile. Requires Bearer token (set at collection level)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var body = pm.response.json();",
+                  "    pm.collectionVariables.set('user_id', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tickets",
+      "description": "Ticket CRUD, transitions, and comments. All require authentication.",
+      "item": [
+        {
+          "name": "List tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tickets?q=&limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tickets"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Case-insensitive substring search on title OR description (optional)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "1–100, default 20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "pagination offset"
+                }
+              ]
+            },
+            "description": "List tickets visible to the caller. Requesters see only their own; agents/admins see all. Use `q` for search."
+          }
+        },
+        {
+          "name": "Create ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tickets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tickets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Printer not working\",\n  \"description\": \"The office printer won't respond.\",\n  \"category\": \"hardware\",\n  \"priority\": \"medium\"\n}"
+            },
+            "description": "Create a ticket. The authenticated user becomes the requester. New tickets start with status `open`. Priority defaults to `medium`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var body = pm.response.json();",
+                  "    pm.collectionVariables.set('ticket_id', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get ticket by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tickets", "{{ticket_id}}"]
+            },
+            "description": "Get ticket details including comments. Caller must be the owner, an agent, or an admin."
+          }
+        },
+        {
+          "name": "Update ticket (status/priority/assignee)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tickets/{{ticket_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tickets", "{{ticket_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\",\n  \"priority\": \"high\",\n  \"assignee_id\": null\n}"
+            },
+            "description": "Update a ticket. All fields optional; only provided fields change.\n\nStatus transitions (enforced):\n- open → in_progress (agent, admin)\n- in_progress → resolved (agent, admin)\n- resolved → closed (requester, agent, admin)\n- resolved → open (requester)\n- open → closed (requester, admin)\n\nPriority/assignee changes: agent/admin only. `assignee_id: 0` unassigns."
+          }
+        },
+        {
+          "name": "Add comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/tickets/{{ticket_id}}/comments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tickets", "{{ticket_id}}", "comments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Looking into this now.\",\n  \"is_internal\": false\n}"
+            },
+            "description": "Add a comment or internal note to a ticket. `is_internal: true` is agent/admin only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management (admin)",
+      "description": "Admin-only endpoints for managing users and roles.",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/users?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "default 50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "pagination offset"
+                }
+              ]
+            },
+            "description": "List all users. Admin role required."
+          }
+        },
+        {
+          "name": "Change user role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/users/{{user_id}}/role",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "{{user_id}}", "role"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"agent\"\n}"
+            },
+            "description": "Change a user's role. Admin only. Role must be one of: requester, agent, admin."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Healthz",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/healthz",
+              "host": ["{{base_url}}"],
+              "path": ["healthz"]
+            },
+            "description": "Liveness probe. Returns 200 OK with body 'ok' (plain text)."
+          }
+        }
+      ]
+    }
+  ]
+}

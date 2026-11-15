@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"simplehelp/src/models"
 )
@@ -13,7 +14,7 @@ import (
 type TicketRepository interface {
 	Create(ctx context.Context, t *models.Ticket) (*models.Ticket, error)
 	GetByID(ctx context.Context, id int64) (*models.Ticket, error)
-	List(ctx context.Context, requesterID int64, role string, limit, offset int) ([]*models.Ticket, error)
+	List(ctx context.Context, requesterID int64, role string, search string, limit, offset int) ([]*models.Ticket, error)
 	Update(ctx context.Context, id int64, status, priority string, assigneeID sql.NullInt64) (*models.Ticket, error)
 }
 
@@ -73,7 +74,7 @@ func (r *ticketRepo) GetByID(ctx context.Context, id int64) (*models.Ticket, err
 	return out, nil
 }
 
-func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, limit, offset int) ([]*models.Ticket, error) {
+func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, search string, limit, offset int) ([]*models.Ticket, error) {
 	// Requesters only see their own tickets; agents/admins see all.
 	q := `
 		SELECT t.id, t.title, t.description, t.category, t.priority,
@@ -82,9 +83,18 @@ func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, l
 		JOIN status s ON s.id = t.status_id
 	`
 	args := []any{}
+	whereParts := []string{}
 	if role == models.RoleRequester {
-		q += " WHERE t.requester_id = $1"
 		args = append(args, requesterID)
+		whereParts = append(whereParts, "t.requester_id = $"+itoa(len(args)))
+	}
+	if search != "" {
+		// Case-insensitive substring match on title OR description.
+		args = append(args, "%"+search+"%")
+		whereParts = append(whereParts, "(t.title ILIKE $"+itoa(len(args))+" OR t.description ILIKE $"+itoa(len(args))+")")
+	}
+	if len(whereParts) > 0 {
+		q += " WHERE " + strings.Join(whereParts, " AND ")
 	}
 	q += " ORDER BY t.id DESC LIMIT $" + itoa(len(args)+1) + " OFFSET $" + itoa(len(args)+2)
 	args = append(args, limit, offset)
@@ -103,7 +113,14 @@ func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, l
 		}
 		out = append(out, t)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Return an empty (non-nil) slice so JSON marshals to [] instead of null.
+	if out == nil {
+		out = []*models.Ticket{}
+	}
+	return out, nil
 }
 
 func (r *ticketRepo) Update(ctx context.Context, id int64, status, priority string, assigneeID sql.NullInt64) (*models.Ticket, error) {
@@ -201,5 +218,11 @@ func (r *commentRepo) ListByTicket(ctx context.Context, ticketID int64) ([]*mode
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if out == nil {
+		out = []*models.Comment{}
+	}
+	return out, nil
 }

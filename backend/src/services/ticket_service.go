@@ -133,12 +133,14 @@ func (s *TicketService) Get(ctx context.Context, id int64) (*TicketDetail, error
 
 // ListFilters are the query params for GET /api/tickets.
 type ListFilters struct {
+	Search string
 	Limit  int
 	Offset int
 }
 
 // List returns tickets visible to the user. Requesters see only their own;
-// agents/admins see all.
+// agents/admins see all. Search (if non-empty) filters by case-insensitive
+// substring match on title OR description.
 func (s *TicketService) List(ctx context.Context, userID int64, role string, f ListFilters) ([]*models.Ticket, error) {
 	if f.Limit <= 0 || f.Limit > 100 {
 		f.Limit = 20
@@ -146,7 +148,7 @@ func (s *TicketService) List(ctx context.Context, userID int64, role string, f L
 	if f.Offset < 0 {
 		f.Offset = 0
 	}
-	return s.tickets.List(ctx, userID, role, f.Limit, f.Offset)
+	return s.tickets.List(ctx, userID, role, f.Search, f.Limit, f.Offset)
 }
 
 // CanView reports whether a user may view a given ticket.
