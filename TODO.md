@@ -1,3 +1,0 @@
-- [x] implement the rest on the endpoints  
-- [x] always develop, then make integration tests for it. only after all passed you move on to next endpoint  
-- [x] dont forget to update the api.md  

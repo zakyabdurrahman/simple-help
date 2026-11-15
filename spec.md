@@ -4,6 +4,7 @@ a helpdesk application to handle customer requests
 - the whole app with multiple components will be runnable using docker with docker compose  
 - use postgresql as database  
 - use Vue 3 composition API for frontend (with vite?)  
+- for frontend use Daisy UI component library
 - use Go with Gin as backend, migrate for migrations
 - use MVC with that separate business logic with db calls to make it testable  
 - will be mobile-first (can be fully used on mobile, usable on laptops screen)  
@@ -39,6 +40,15 @@ a helpdesk application to handle customer requests
 | `POST` | `/api/tickets/{id}/comments` | Add a comment or internal note | Owner, agent, admin |
 | `GET` | `/api/users` | List users | Admin |
 | `PATCH` | `/api/users/{id}/role` | Change user role | Admin |
+
+## Frontend Functions  
+| Page | Minimum Content |
+| :--- | :--- |
+| **Login & Register** | Form with client-side validation and server-side error display |
+| **Ticket List** | Table with filters, search, pagination, status badges, and priority badges |
+| **Create Ticket** | Form with validation, displaying success or failure messages |
+| **Ticket Details** | Ticket information, comment history, comment form, and role-based status change buttons |
+| **Manage Users (Admin)** | User list and role management |
 
 ## Auth
 
