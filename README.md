@@ -43,6 +43,16 @@ docker compose exec db psql -U simplehelp -d simplehelp -c "\dt"
 You should see five tables: `users`, `status`, `tickets`, `comments`, and
 `schema_migrations` (golang-migrate's version-tracking table).
 
+### Accessing the app
+| Service   | URL                    |
+| --------- | ---------------------- |
+| Frontend  | http://localhost:3000  |
+| Backend   | http://localhost:8080  |
+| Database  | localhost:5433         |
+
+The frontend (Nginx) proxies `/api` to the backend, so all API calls go
+through a single origin — no CORS configuration needed.
+
 ### Connection details
 | Setting | Value |
 | --- | --- |
@@ -150,6 +160,7 @@ See [`api.md`](api.md) for the full HTTP API contract.
 ├── .env                           # local secrets (gitignored)
 ├── .gitignore
 ├── api.md                          # API contract
+├── postman_collection.json         # Postman collection
 ├── backend/
 │   ├── Dockerfile
 │   ├── entrypoint.sh               # runs migrate up, then ./server
@@ -175,7 +186,20 @@ See [`api.md`](api.md) for the full HTTP API contract.
 │       ├── server/
 │       ├── services/
 │       └── validation/
-└── frontend/                       # planned
+└── frontend/
+    ├── Dockerfile                  # multi-stage: Node build → Nginx serve
+    ├── nginx.conf                  # proxies /api → backend
+    ├── package.json
+    ├── vite.config.ts
+    ├── tailwind.config.js
+    └── src/
+        ├── api/                    # axios client + interceptors
+        ├── assets/                 # Tailwind CSS
+        ├── components/             # StatusBadge, FormField
+        ├── router/                 # Vue Router with auth guards
+        ├── stores/                 # Pinia auth store
+        ├── types/                  # TS types matching API models
+        └── views/                  # Login, TicketList, TicketCreate, TicketDetail, Users
 ```
 ## Assumptions
 

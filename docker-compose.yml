@@ -38,6 +38,16 @@ services:
     ports:
       - "8080:8080"
 
+  frontend:
+    build:
+      context: ./frontend
+    container_name: simplehelp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
   test:
     profiles: ["test"]
     build:
