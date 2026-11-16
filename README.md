@@ -56,26 +56,6 @@ You should see five tables: `users`, `status`, `tickets`, `comments`, and
 The frontend (Nginx) proxies `/api` to the backend, so all API calls go
 through a single origin — no CORS configuration needed.
 
-### Connection details
-
-The DB values below come from `.env` (`POSTGRES_DB`/`POSTGRES_USER`/
-`POSTGRES_PASSWORD` for the `db` service, mirrored as `DB_*` for the backend).
-Defaults are shown; override them in `.env` for non-default setups.
-
-| Setting | Value (default) |
-| --- | --- |
-| Host (from host machine) | `localhost` |
-| Port (from host machine) | `5433` |
-| Port (from other containers) | `5432` |
-| Database | `${POSTGRES_DB}` / `${DB_NAME}` |
-| User | `${POSTGRES_USER}` / `${DB_USER}` |
-| Password | `${POSTGRES_PASSWORD}` / `${DB_PASS}` |
-
-Connect from a host tool (psql, DBeaver, etc.):
-```bash
-psql -h localhost -p 5433 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
-```
-
 ### Seeding users
 
 A seeder command (`/app/seed`) creates one user per role (`requester`,
@@ -214,5 +194,4 @@ See [`api.md`](api.md) for the full HTTP API contract.
         ├── types/                  # TS types matching API models
         └── views/                  # Login, TicketList, TicketCreate, TicketDetail, Users
 ```
-## Assumptions
 

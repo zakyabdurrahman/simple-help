@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import client, { extractApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { TicketDetail, Comment } from '@/types'
+import type { Ticket, TicketDetail, Comment } from '@/types'
 import StatusBadge from '@/components/StatusBadge.vue'
 
 const route = useRoute()
@@ -41,23 +41,23 @@ const allowedTransitions = computed<Transition[]>(() => {
 
   // open -> in_progress (agent, admin)
   if (status === 'open' && (role === 'agent' || role === 'admin')) {
-    transitions.push({ to: 'in_progress', label: 'Start Progress', class: 'btn-warning' })
+    transitions.push({ to: 'in_progress', label: 'Move to In Progress', class: 'btn-warning' })
   }
   // open -> closed (requester, admin)
   if (status === 'open' && (role === 'requester' || role === 'admin')) {
-    transitions.push({ to: 'closed', label: 'Cancel', class: 'btn-ghost' })
+    transitions.push({ to: 'closed', label: 'Cancel Ticket', class: 'btn-ghost' })
   }
   // in_progress -> resolved (agent, admin)
   if (status === 'in_progress' && (role === 'agent' || role === 'admin')) {
-    transitions.push({ to: 'resolved', label: 'Resolve', class: 'btn-success' })
+    transitions.push({ to: 'resolved', label: 'Mark as Resolved', class: 'btn-success' })
   }
   // resolved -> closed (requester, agent, admin)
   if (status === 'resolved') {
-    transitions.push({ to: 'closed', label: 'Close', class: 'btn-success' })
+    transitions.push({ to: 'closed', label: 'Mark as Closed', class: 'btn-success' })
   }
   // resolved -> open (requester)
   if (status === 'resolved' && role === 'requester') {
-    transitions.push({ to: 'open', label: 'Reopen', class: 'btn-warning' })
+    transitions.push({ to: 'open', label: 'Reopen Ticket', class: 'btn-warning' })
   }
   return transitions
 })
@@ -87,8 +87,17 @@ async function changeStatus(to: string) {
   updateLoading.value = true
   updateError.value = ''
   try {
-    const { data } = await client.patch<TicketDetail>(`/api/tickets/${ticket.value.id}`, { status: to })
-    ticket.value = data
+    // PATCH returns a plain Ticket (no comments); merge the existing
+    // comments onto the response so the template keeps rendering them
+    // instead of going blank on `ticket.comments` being undefined.
+    const payload: Record<string, unknown> = { status: to }
+    // Starting work also claims the ticket for the acting agent/admin,
+    // so "Move to In Progress" is a single action.
+    if (to === 'in_progress' && auth.user) {
+      payload.assignee_id = auth.user.id
+    }
+    const { data } = await client.patch<Ticket>(`/api/tickets/${ticket.value.id}`, payload)
+    ticket.value = { ...data, comments: ticket.value.comments }
   } catch (err) {
     updateError.value = extractApiError(err).error
   } finally {
@@ -101,24 +110,10 @@ async function changePriority() {
   updateLoading.value = true
   updateError.value = ''
   try {
-    const { data } = await client.patch<TicketDetail>(`/api/tickets/${ticket.value.id}`, { priority: newPriority.value })
-    ticket.value = data
+    const { data } = await client.patch<Ticket>(`/api/tickets/${ticket.value.id}`, { priority: newPriority.value })
+    ticket.value = { ...data, comments: ticket.value.comments }
     showPrioritySelect.value = false
     newPriority.value = ''
-  } catch (err) {
-    updateError.value = extractApiError(err).error
-  } finally {
-    updateLoading.value = false
-  }
-}
-
-async function claimTicket() {
-  if (!ticket.value || !auth.user) return
-  updateLoading.value = true
-  updateError.value = ''
-  try {
-    const { data } = await client.patch<TicketDetail>(`/api/tickets/${ticket.value.id}`, { assignee_id: auth.user.id })
-    ticket.value = data
   } catch (err) {
     updateError.value = extractApiError(err).error
   } finally {
@@ -179,8 +174,10 @@ onMounted(fetchTicket)
           <p class="mt-2 whitespace-pre-wrap">{{ ticket.description }}</p>
 
           <div class="text-sm text-base-content/60 mt-2">
-            <span>Requester: #{{ ticket.requester_id }}</span>
-            <span v-if="ticket.assignee_id"> · Assignee: #{{ ticket.assignee_id }}</span>
+            <span>Requester: {{ ticket.requester_name }} &lt;{{ ticket.requester_email }}&gt;</span>
+            <span v-if="ticket.assignee_id">
+              · Assignee: {{ ticket.assignee_name }} &lt;{{ ticket.assignee_email }}&gt;
+            </span>
             <span v-else> · Unassigned</span>
           </div>
 
@@ -213,16 +210,6 @@ onMounted(fetchTicket)
               <button class="btn btn-sm btn-primary" @click="changePriority" :disabled="updateLoading">Save</button>
               <button class="btn btn-sm btn-ghost" @click="showPrioritySelect = false">Cancel</button>
             </div>
-
-            <!-- Claim (agent/admin, unassigned) -->
-            <button
-              v-if="canManage && !ticket.assignee_id"
-              class="btn btn-sm btn-outline"
-              :disabled="updateLoading"
-              @click="claimTicket"
-            >
-              Claim
-            </button>
           </div>
         </div>
       </div>
@@ -243,7 +230,7 @@ onMounted(fetchTicket)
               :class="['chat', 'chat-start']"
             >
               <div class="chat-header">
-                User #{{ c.author_id }}
+                {{ c.author_name }}
                 <span v-if="c.is_internal" class="badge badge-error badge-xs ml-1">internal</span>
                 <time class="text-xs opacity-50 ml-1">{{ new Date(c.created_at).toLocaleString() }}</time>
               </div>

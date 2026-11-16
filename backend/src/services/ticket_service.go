@@ -78,17 +78,21 @@ type TicketDetail struct {
 // inlined (no "ticket" wrapper) and comments is a top-level array, matching
 // the API contract in api.md.
 type ticketDetailJSON struct {
-	ID          int64              `json:"id"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	Category    any                `json:"category"`
-	Priority    string             `json:"priority"`
-	Status      string             `json:"status"`
-	RequesterID int64              `json:"requester_id"`
-	AssigneeID  any                `json:"assignee_id"`
-	CreatedAt   string             `json:"created_at"`
-	UpdatedAt   string             `json:"updated_at"`
-	Comments    []*models.Comment  `json:"comments"`
+	ID             int64             `json:"id"`
+	Title          string            `json:"title"`
+	Description    string            `json:"description"`
+	Category       any               `json:"category"`
+	Priority       string            `json:"priority"`
+	Status         string            `json:"status"`
+	RequesterID    int64             `json:"requester_id"`
+	RequesterName  string            `json:"requester_name"`
+	RequesterEmail string            `json:"requester_email"`
+	AssigneeID     any               `json:"assignee_id"`
+	AssigneeName   any               `json:"assignee_name"`
+	AssigneeEmail  any               `json:"assignee_email"`
+	CreatedAt      string            `json:"created_at"`
+	UpdatedAt      string            `json:"updated_at"`
+	Comments       []*models.Comment `json:"comments"`
 }
 
 // MarshalJSON renders TicketDetail with the ticket fields inlined plus a
@@ -101,6 +105,8 @@ func (d TicketDetail) MarshalJSON() ([]byte, error) {
 		ID: d.Ticket.ID, Title: d.Ticket.Title, Description: d.Ticket.Description,
 		Priority: d.Ticket.Priority, Status: d.Ticket.Status,
 		RequesterID: d.Ticket.RequesterID,
+		RequesterName:  d.Ticket.RequesterName,
+		RequesterEmail: d.Ticket.RequesterEmail,
 		CreatedAt:   d.Ticket.CreatedAt.Format(time.RFC3339Nano),
 		UpdatedAt:   d.Ticket.UpdatedAt.Format(time.RFC3339Nano),
 		Comments:    d.Comments,
@@ -110,6 +116,12 @@ func (d TicketDetail) MarshalJSON() ([]byte, error) {
 	}
 	if d.Ticket.AssigneeID.Valid {
 		out.AssigneeID = d.Ticket.AssigneeID.Int64
+	}
+	if d.Ticket.AssigneeName.Valid {
+		out.AssigneeName = d.Ticket.AssigneeName.String
+	}
+	if d.Ticket.AssigneeEmail.Valid {
+		out.AssigneeEmail = d.Ticket.AssigneeEmail.String
 	}
 	return json.Marshal(out)
 }
@@ -284,5 +296,13 @@ func (s *TicketService) CreateComment(ctx context.Context, in CreateCommentInput
 		Body:       in.Body,
 		IsInternal: in.IsInternal,
 	}
-	return s.comments.Create(ctx, c)
+	saved, err := s.comments.Create(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	// The repo's RETURNING doesn't join users; fill from the actor we
+	// already have so the response includes author_name/author_email.
+	saved.AuthorName = actor.Name
+	saved.AuthorEmail = actor.Email
+	return saved, nil
 }

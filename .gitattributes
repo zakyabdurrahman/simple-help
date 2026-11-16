@@ -1,0 +1,18 @@
+# Default: text files use LF line endings in the repo and working tree.
+# This matters for shell scripts, Dockerfiles, nginx configs, and any
+# other file that ends up inside a Linux container — CRLF breaks shebangs
+# and shell parsing silently.
+* text=auto eol=lf
+
+# Windows-only files keep CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary files — never normalize.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
