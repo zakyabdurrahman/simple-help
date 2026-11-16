@@ -14,14 +14,17 @@ A helpdesk application to handle customer requests.
 
 ## First-time setup
 
-Copy the env template and set a JWT secret (required — the backend won't
-start without it):
+Copy the env template and fill in real values. At minimum set a strong
+`JWT_SECRET` (required — the backend won't start without it). The `DB_*` and
+`POSTGRES_*` variables come pre-populated with the default `simplehelp`
+credentials, which are fine for local dev — change them for anything beyond
+that:
 ```bash
 cp .env.example .env
-# edit .env and set JWT_SECRET to a strong random string
+# edit .env: set JWT_SECRET (and DB creds if not using the defaults)
 ```
 `.env` is gitignored; `.env.example` is the tracked template. Docker Compose
-reads `.env` automatically.
+reads `.env` automatically for `${VAR}` substitution in `docker-compose.yml`.
 
 ## Running the App
 
@@ -38,7 +41,7 @@ before serving traffic, then listens on `:8080`.
 
 Verify the schema was created:
 ```bash
-docker compose exec db psql -U simplehelp -d simplehelp -c "\dt"
+docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"'
 ```
 You should see five tables: `users`, `status`, `tickets`, `comments`, and
 `schema_migrations` (golang-migrate's version-tracking table).
@@ -54,18 +57,23 @@ The frontend (Nginx) proxies `/api` to the backend, so all API calls go
 through a single origin — no CORS configuration needed.
 
 ### Connection details
-| Setting | Value |
+
+The DB values below come from `.env` (`POSTGRES_DB`/`POSTGRES_USER`/
+`POSTGRES_PASSWORD` for the `db` service, mirrored as `DB_*` for the backend).
+Defaults are shown; override them in `.env` for non-default setups.
+
+| Setting | Value (default) |
 | --- | --- |
 | Host (from host machine) | `localhost` |
 | Port (from host machine) | `5433` |
 | Port (from other containers) | `5432` |
-| Database | `simplehelp` |
-| User | `simplehelp` |
-| Password | `simplehelp` |
+| Database | `${POSTGRES_DB}` / `${DB_NAME}` |
+| User | `${POSTGRES_USER}` / `${DB_USER}` |
+| Password | `${POSTGRES_PASSWORD}` / `${DB_PASS}` |
 
 Connect from a host tool (psql, DBeaver, etc.):
 ```bash
-psql -h localhost -p 5433 -U simplehelp -d simplehelp
+psql -h localhost -p 5433 -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 ```
 
 ### Seeding users
@@ -88,19 +96,24 @@ Seed accounts:
 
 ### Configuration
 
-The backend reads configuration from environment variables (defaults match
-docker-compose):
+The backend reads configuration from environment variables. Defaults below
+match the in-code fallbacks so the app runs outside Docker without an env
+file; inside Docker, the values come from `.env` via `docker-compose.yml`
+substitution.
 
-| Variable     | Default              | Notes                                   |
-| ------------ | -------------------- | --------------------------------------- |
-| `DB_HOST`    | `db`                 |                                         |
-| `DB_PORT`    | `5432`               |                                         |
-| `DB_USER`    | `simplehelp`         |                                         |
-| `DB_PASS`    | `simplehelp`         |                                         |
-| `DB_NAME`    | `simplehelp`         |                                         |
-| `PORT`       | `8080`               | HTTP listen port.                       |
-| `JWT_SECRET` | `dev-secret-change-me` | Set to a strong random value in prod. |
-| `JWT_EXPIRY` | `24h`                | Go duration syntax (e.g. `1h`, `30m`).  |
+| Variable          | Default                | Notes                                        |
+| ----------------- | ---------------------- | -------------------------------------------- |
+| `DB_HOST`         | `db`                   |                                              |
+| `DB_PORT`         | `5432`                 |                                              |
+| `DB_USER`         | `simplehelp`           |                                              |
+| `DB_PASS`         | `simplehelp`           |                                              |
+| `DB_NAME`         | `simplehelp`           |                                              |
+| `PORT`            | `8080`                 | HTTP listen port.                            |
+| `JWT_SECRET`      | `dev-secret-change-me` | Set to a strong random value in prod.        |
+| `JWT_EXPIRY`      | `24h`                  | Go duration syntax (e.g. `1h`, `30m`).       |
+| `POSTGRES_DB`     | `simplehelp`           | `db` service only (initial DB created).      |
+| `POSTGRES_USER`   | `simplehelp`           | `db` service only (initial superuser).       |
+| `POSTGRES_PASSWORD` | `simplehelp`          | `db` service only. Change in `.env` for dev. |
 
 ### Stopping
 ```bash

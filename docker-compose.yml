@@ -4,15 +4,15 @@ services:
     container_name: simplehelp-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: simplehelp
-      POSTGRES_USER: simplehelp
-      POSTGRES_PASSWORD: simplehelp
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required — see .env.example}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required — see .env.example}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — see .env.example}
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U simplehelp -d simplehelp"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,11 +27,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_USER: simplehelp
-      DB_PASS: simplehelp
-      DB_NAME: simplehelp
+      DB_HOST: ${DB_HOST:?DB_HOST is required — see .env.example}
+      DB_PORT: ${DB_PORT:?DB_PORT is required — see .env.example}
+      DB_USER: ${DB_USER:?DB_USER is required — see .env.example}
+      DB_PASS: ${DB_PASS:?DB_PASS is required — see .env.example}
+      DB_NAME: ${DB_NAME:?DB_NAME is required — see .env.example}
       PORT: "8080"
       # JWT_SECRET must be provided via .env (see .env.example).
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — copy .env.example to .env}
@@ -58,11 +58,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_USER: simplehelp
-      DB_PASS: simplehelp
-      DB_NAME: simplehelp
+      DB_HOST: ${DB_HOST:?DB_HOST is required — see .env.example}
+      DB_PORT: ${DB_PORT:?DB_PORT is required — see .env.example}
+      DB_USER: ${DB_USER:?DB_USER is required — see .env.example}
+      DB_PASS: ${DB_PASS:?DB_PASS is required — see .env.example}
+      DB_NAME: ${DB_NAME:?DB_NAME is required — see .env.example}
       PORT: "8080"
     # The test stage's CMD applies migrations then runs `go test ./...`.
     # To pass extra go test flags, override the command (see README).
