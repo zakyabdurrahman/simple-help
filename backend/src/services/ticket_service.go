@@ -145,9 +145,11 @@ func (s *TicketService) Get(ctx context.Context, id int64) (*TicketDetail, error
 
 // ListFilters are the query params for GET /api/tickets.
 type ListFilters struct {
-	Search string
-	Limit  int
-	Offset int
+	Search   string
+	Status   string
+	Priority string
+	Limit    int
+	Offset   int
 }
 
 // List returns tickets visible to the user. Requesters see only their own;
@@ -160,7 +162,19 @@ func (s *TicketService) List(ctx context.Context, userID int64, role string, f L
 	if f.Offset < 0 {
 		f.Offset = 0
 	}
-	return s.tickets.List(ctx, userID, role, f.Search, f.Limit, f.Offset)
+	// Validate enum filters. Empty means "no filter".
+	errs := validation.FieldErrors{}
+	if f.Status != "" && f.Status != models.StatusOpen && f.Status != models.StatusInProgress &&
+		f.Status != models.StatusResolved && f.Status != models.StatusClosed {
+		errs["status"] = "must be one of open, in_progress, resolved, closed"
+	}
+	if f.Priority != "" && f.Priority != models.PriorityLow && f.Priority != models.PriorityMedium && f.Priority != models.PriorityHigh {
+		errs["priority"] = "must be one of low, medium, high"
+	}
+	if !errs.IsEmpty() {
+		return nil, &ValidationError{Fields: errs}
+	}
+	return s.tickets.List(ctx, userID, role, f.Search, f.Status, f.Priority, f.Limit, f.Offset)
 }
 
 // CanView reports whether a user may view a given ticket.

@@ -544,6 +544,111 @@ func TestTicket_Search_EmptyReturnsAll(t *testing.T) {
 	}
 }
 
+// ---------- Ticket: filters ----------
+
+func TestTicket_Filter_Status(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	rTok, _ := seedRoleToken(t, h, models.RoleRequester)
+
+	// Create three tickets (all open).
+	for _, title := range []string{"keep-open-1", "close-me", "keep-open-2"} {
+		w := doJSONAuth(t, h, "POST", "/api/tickets", rTok, map[string]string{"title": title, "description": "d"})
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create %s failed: %d %s", title, w.Code, w.Body.String())
+		}
+	}
+
+	// Close one (requester can transition open->closed).
+	w := doJSONAuth(t, h, "GET", "/api/tickets", rTok, nil)
+	tickets := parseJSON(t, w)["tickets"].([]any)
+	var closeID int64
+	for _, tk := range tickets {
+		m := tk.(map[string]any)
+		if m["title"] == "close-me" {
+			closeID = int64(m["id"].(float64))
+		}
+	}
+	w = doJSONAuth(t, h, "PATCH", "/api/tickets/"+itoaStr(closeID), rTok, map[string]string{"status": "closed"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("close failed: %d %s", w.Code, w.Body.String())
+	}
+
+	// Filter status=closed -> 1.
+	req := httptest.NewRequest("GET", "/api/tickets?status=closed", nil)
+	req.Header.Set("Authorization", "Bearer "+rTok)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got := parseJSON(t, w)["tickets"].([]any)
+	if len(got) != 1 {
+		t.Errorf("status=closed should return 1, got %d", len(got))
+	}
+
+	// Filter status=open -> 2.
+	req = httptest.NewRequest("GET", "/api/tickets?status=open", nil)
+	req.Header.Set("Authorization", "Bearer "+rTok)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	got = parseJSON(t, w)["tickets"].([]any)
+	if len(got) != 2 {
+		t.Errorf("status=open should return 2, got %d", len(got))
+	}
+}
+
+func TestTicket_Filter_Priority(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	rTok, _ := seedRoleToken(t, h, models.RoleRequester)
+
+	// Create three tickets with distinct priorities.
+	for _, p := range []string{"low", "medium", "high"} {
+		w := doJSONAuth(t, h, "POST", "/api/tickets", rTok, map[string]string{
+			"title": "p-" + p, "description": "d", "priority": p,
+		})
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create %s failed: %d %s", p, w.Code, w.Body.String())
+		}
+	}
+
+	// Filter priority=high -> 1.
+	req := httptest.NewRequest("GET", "/api/tickets?priority=high", nil)
+	req.Header.Set("Authorization", "Bearer "+rTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	got := parseJSON(t, w)["tickets"].([]any)
+	if len(got) != 1 {
+		t.Errorf("priority=high should return 1, got %d", len(got))
+	}
+}
+
+func TestTicket_Filter_InvalidStatus(t *testing.T) {
+	resetUsers(t)
+	h := newEngine()
+	rTok, _ := seedRoleToken(t, h, models.RoleRequester)
+
+	req := httptest.NewRequest("GET", "/api/tickets?status=garbage", nil)
+	req.Header.Set("Authorization", "Bearer "+rTok)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	body := parseJSON(t, w)
+	if body["error"] != "validation_failed" {
+		t.Errorf("error = %v, want validation_failed", body["error"])
+	}
+	fields, ok := body["fields"].(map[string]any)
+	if !ok || fields["status"] == nil {
+		t.Error("expected fields.status in validation error")
+	}
+}
+
 // itoaStr is a tiny int64->string helper to avoid importing strconv in tests.
 func itoaStr(n int64) string {
 	if n == 0 {

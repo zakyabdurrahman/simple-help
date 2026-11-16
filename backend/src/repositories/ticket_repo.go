@@ -14,7 +14,7 @@ import (
 type TicketRepository interface {
 	Create(ctx context.Context, t *models.Ticket) (*models.Ticket, error)
 	GetByID(ctx context.Context, id int64) (*models.Ticket, error)
-	List(ctx context.Context, requesterID int64, role string, search string, limit, offset int) ([]*models.Ticket, error)
+	List(ctx context.Context, requesterID int64, role, search, status, priority string, limit, offset int) ([]*models.Ticket, error)
 	Update(ctx context.Context, id int64, status, priority string, assigneeID sql.NullInt64) (*models.Ticket, error)
 }
 
@@ -82,7 +82,7 @@ func (r *ticketRepo) GetByID(ctx context.Context, id int64) (*models.Ticket, err
 	return out, nil
 }
 
-func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, search string, limit, offset int) ([]*models.Ticket, error) {
+func (r *ticketRepo) List(ctx context.Context, requesterID int64, role, search, status, priority string, limit, offset int) ([]*models.Ticket, error) {
 	// Requesters only see their own tickets; agents/admins see all.
 	q := `
 		SELECT t.id, t.title, t.description, t.category, t.priority,
@@ -104,6 +104,14 @@ func (r *ticketRepo) List(ctx context.Context, requesterID int64, role string, s
 		// Case-insensitive substring match on title OR description.
 		args = append(args, "%"+search+"%")
 		whereParts = append(whereParts, "(t.title ILIKE $"+itoa(len(args))+" OR t.description ILIKE $"+itoa(len(args))+")")
+	}
+	if status != "" {
+		args = append(args, status)
+		whereParts = append(whereParts, "s.text = $"+itoa(len(args)))
+	}
+	if priority != "" {
+		args = append(args, priority)
+		whereParts = append(whereParts, "t.priority = $"+itoa(len(args)))
 	}
 	if len(whereParts) > 0 {
 		q += " WHERE " + strings.Join(whereParts, " AND ")

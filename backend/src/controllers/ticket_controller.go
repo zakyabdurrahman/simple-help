@@ -82,8 +82,10 @@ func (c *TicketController) List(ctx *gin.Context) {
 	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "20"))
 	offset, _ := strconv.Atoi(ctx.DefaultQuery("offset", "0"))
 	search := ctx.Query("q")
+	status := ctx.Query("status")
+	priority := ctx.Query("priority")
 	tickets, err := c.tickets.List(ctx.Request.Context(), uid, role, services.ListFilters{
-		Search: search, Limit: limit, Offset: offset,
+		Search: search, Status: status, Priority: priority, Limit: limit, Offset: offset,
 	})
 	if err != nil {
 		c.writeTicketError(ctx, err)
